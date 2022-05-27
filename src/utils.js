@@ -52,8 +52,15 @@ function isRetriable(err) {
   return notReady500 || notReady502 || notReady503;
 }
 
+function sleep(seconds) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 1000 * seconds);
+  });
+}
+
 module.exports = {
   defaults,
   validate,
   isRetriable,
+  sleep,
 };

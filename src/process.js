@@ -3,11 +3,14 @@ const { spawn, exec: execCallback } = require("child_process");
 const exec = promisify(execCallback);
 const platform = require("os").platform();
 const { join } = require("path");
+const { sleep } = require("./utils");
 
 const defaultDir = join(__dirname, "..", "bin");
 const bin = platform === "win32" ? "ngrok.exe" : "ngrok";
 const ready = /starting web service.*addr=(\d+\.\d+\.\d+\.\d+:\d+)/;
 const inUse = /address already in use/;
+const errorMessageRegEx = /ERROR.*/;
+const errorCodeRegEx = /ERR_NGROK_\d*/;
 
 let processPromise, activeProcess;
 
@@ -78,9 +81,23 @@ async function startProcess(opts) {
     })
   });
 
+  let errors = [];
+
   ngrok.stderr.on("data", (data) => {
     const msg = data.toString().substring(0, 10000);
-    reject(new Error(msg));
+    const lines = msg.split(/\n/);
+    lines.forEach(line => {
+      let errorMessage = line.match(errorMessageRegEx);
+      if (errorMessage) {
+        errors.push(cleanError(errorMessage[0]));
+        if (line.match(errorCodeRegEx)) {
+          reject(new Error(errors.join('\n')));
+          if (opts.onErrorEvent) {
+            opts.onErrorEvent(new Error(errors.join('\n')));
+          }
+        }
+      }
+    })
   });
 
   ngrok.on("exit", () => {
@@ -91,6 +108,11 @@ async function startProcess(opts) {
     }
   });
 
+  sleep(2).then(() => {
+    const message = (errors.length) ? errors.join('\n') : 'failed to start the ngrok process';
+    reject(new Error(message));
+  });
+
   try {
     const url = await apiUrl;
     activeProcess = ngrok;
@@ -99,12 +121,19 @@ async function startProcess(opts) {
     ngrok.kill();
     throw ex;
   } finally {
-    // Remove the stdout listeners if nobody is interested in the content.
+    // Remove the listeners if nobody is interested in the content.
     if (!opts.onLogEvent && !opts.onStatusChange) {
       ngrok.stdout.removeAllListeners("data");
     }
-    ngrok.stderr.removeAllListeners("data");
+    if (!opts.onErrorEvent) {
+      ngrok.stderr.removeAllListeners("data");
+    }
   }
+}
+
+function cleanError(message) {
+  const newMessage = message.replace(/ERROR:\s+/, '');
+  return newMessage.replace(errorCodeRegEx, `More info: https://ngrok.com/docs/errors/${newMessage.toLowerCase()}`);
 }
 
 function killProcess() {

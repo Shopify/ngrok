@@ -6,35 +6,44 @@ const {
   setAuthtoken,
   getVersion,
 } = require("./src/process");
-const { defaults, validate, isRetriable } = require("./src/utils");
+const { defaults, validate, sleep } = require("./src/utils");
 
 let processUrl = null;
 let ngrokClient = null;
 
-async function connect(opts) {
-  opts = defaults(opts);
-  validate(opts);
-  if (opts.authtoken) {
-    await setAuthtoken(opts);
-  }
-
-  processUrl = await getProcess(opts);
-  ngrokClient = new NgrokClient(processUrl);
-  return connectRetry(opts);
+function connect(opts) {
+  return new Promise(async(resolve, reject) => {
+    opts = defaults(opts);
+    opts.onErrorEvent = (error) => {
+      reject(error)
+      ngrokClient = null;
+    };
+    validate(opts);
+    if (opts.authtoken) {
+      await setAuthtoken(opts);
+    }
+    processUrl = await getProcess(opts).catch(reject);
+    ngrokClient = new NgrokClient(processUrl);
+    
+    const url = await connectRetry(opts);
+    resolve(url);
+  })
 }
 
 async function connectRetry(opts, retryCount = 0) {
-  opts.name = String(opts.name || uuid.v4());
-  try {
-    const response = await ngrokClient.startTunnel(opts);
-    return response.public_url;
-  } catch (err) {
-    if (!isRetriable(err) || retryCount >= 100) {
-      throw err;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    return connectRetry(opts, ++retryCount);
+  if (!processUrl || !ngrokClient) {
+    return;
   }
+  opts.name = String(opts.name || uuid.v4());
+  const response = await ngrokClient.startTunnel(opts);
+  if (response) {
+    return response.public_url;
+  }
+  if (retryCount >= 10) {
+    throw new Error('failed to start the tunnel');
+  }
+  await sleep(0.2);
+  return connectRetry(opts, ++retryCount);
 }
 
 async function disconnect(publicUrl) {

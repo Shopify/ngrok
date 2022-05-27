@@ -1,4 +1,5 @@
 const got = require("got");
+const { sleep } = require("./utils");
 
 class NgrokClientError extends Error {
   constructor(message, response, body) {
@@ -27,6 +28,11 @@ class NgrokClient {
         return await this.internalApi[method](path, { json: options }).json();
       }
     } catch (error) {
+      if (options.onErrorEvent) {
+        // Wait a bit until the error message is read from the process stderr
+        await sleep(1);
+        return undefined;
+      }
       let clientError;
       try {
         const response = JSON.parse(error.response.body);
