@@ -179,6 +179,47 @@ async function setAuthtoken(optsOrToken) {
   }
 }
 
+ async function configCheck() {
+  let dir = defaultDir;
+  const command = ["config", "check"];
+  const ngrok = spawn(join(dir, bin), command, { windowsHide: true });
+
+  const killed = new Promise((resolve, reject) => {
+    ngrok.stdout.once("data", (data) => {
+      const msg = data.toString().trim();
+      if (msg.match(/Valid configuration file/)) {
+        resolve();
+      } else {
+        reject();
+      }
+    });
+    ngrok.stderr.once("data", () => { reject(); });
+  });
+
+  try {
+    return await killed.then(() => true).catch(() => false);
+  } finally {
+    ngrok.kill();
+  }
+}
+
+ async function configUpgrade() {
+  let dir = defaultDir;
+  const command = ["config", "upgrade"];
+  const ngrok = spawn(join(dir, bin), command, { windowsHide: true });
+
+  const killed = new Promise((resolve, reject) => {
+    ngrok.stdout.once("data", () => resolve());
+    ngrok.stderr.once("data", () => reject(new Error("cant upgrade config")));
+  });
+
+  try {
+    return await killed;
+  } finally {
+    ngrok.kill();
+  }
+}
+
 /**
  * @param {Ngrok.Options | undefined} opts
  */
@@ -194,4 +235,6 @@ module.exports = {
   killProcess,
   setAuthtoken,
   getVersion,
+  configCheck,
+  configUpgrade,
 };

@@ -5,6 +5,8 @@ const {
   killProcess,
   setAuthtoken,
   getVersion,
+  configCheck,
+  configUpgrade,
 } = require("./src/process");
 const { defaults, validate, sleep } = require("./src/utils");
 
@@ -79,6 +81,14 @@ function getApi() {
   return ngrokClient;
 }
 
+async function validConfig() {
+  return configCheck();
+}
+
+async function upgradeConfig() {
+  return configUpgrade();
+}
+
 module.exports = {
   connect,
   disconnect,
@@ -88,5 +98,7 @@ module.exports = {
   getApi,
   getVersion,
   NgrokClient,
-  NgrokClientError
+  NgrokClientError,
+  validConfig,
+  upgradeConfig,
 };

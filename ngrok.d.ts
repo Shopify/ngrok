@@ -61,6 +61,18 @@ declare module "ngrok" {
    */
   export function getVersion(options?: Ngrok.Options): Promise<string>;
 
+  /**
+   *
+   * Checks if the ngrok configuration is valid.
+   */
+  export function validConfig(): Promise<boolean>;
+  
+  /**
+   *
+   * Upgrades the ngrok config to work with version 3.
+   */
+  export function upgradeConfig(): Promise<void>;
+
   namespace Ngrok {
     // This is a protocol that you can select when starting a tunnel.
     type Protocol = "http" | "tcp" | "tls";
