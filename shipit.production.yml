@@ -7,4 +7,4 @@ dependencies:
 
 deploy:
   override:
-    - npm run changeset publish
+    - npx changeset publish
